@@ -1,2 +1,2 @@
 # paraX
-python multiprocessing boilerplate library w/ tqdm progress bar
+python multi-thread/processing boilerplate library w/ tqdm progress bar
