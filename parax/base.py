@@ -69,7 +69,7 @@ class BaseExecutor(ABC):
         if input_tqdm_enabled is False: # if user explicitly disables
             return (
                 False,
-                None,
+                "",
                 BaseExecutor.default_tqdm_class(),
             )
         else:
@@ -85,19 +85,10 @@ class BaseExecutor(ABC):
                 _tqdm_class,
             )
 
-        
-
-        
-
-
     @staticmethod
     def default_tqdm_class() -> type[tqdm]:
         from tqdm import tqdm # tqdm_std
         return tqdm
-
-        
-
-
 
     @staticmethod
     def default_num_workers() -> int:
@@ -129,8 +120,44 @@ class BaseExecutor(ABC):
         return 1000
     
     def validate_attributes(self):
-        pass
+        from tqdm import tqdm
 
+        def generate_error_message(attribute_name: str, expected_type: type) -> str:
+            attribute_value = getattr(self, attribute_name)
+            attribute_value_type = type(attribute_value)
+            error_msg = f"expected type {expected_type} for attribute self.{attribute_name}, instead got type {attribute_value_type}"
+            return error_msg
+
+        if not isinstance(self.worker_fn, callable):
+            msg = generate_error_message("worker_fn", callable)
+            raise TypeError(msg)
+
+        for kwargs in self.worker_fn_kwargs:
+            if not isinstance(kwargs, dict):
+                raise TypeError(
+                    "expected self.worker_fn_kwargs to be a list of dicts"
+                    f"instead encountered: {type(kwargs)}"
+                )
+
+        if not isinstance(self.num_workers, int): 
+            msg = generate_error_message("num_workers", int)
+            raise TypeError(msg)
+
+        if not isinstance(self.batch_size, int): 
+            msg = generate_error_message("batch_size", int)
+            raise TypeError(msg)
+        
+        if not isinstance(self.tqdm_enabled, bool): 
+            msg = generate_error_message("tqdm_enabled", bool)
+            raise TypeError(msg)
+
+        if not isinstance(self.tqdm_description, str): 
+            msg = generate_error_message("tqdm_description", str)
+            raise TypeError(msg)
+
+        if not issubclass(self.tqdm_class, tqdm): 
+            msg = f"provided tqdm_class {self.tqdm_class} is not a subclass of tqdm"
+            raise TypeError(msg)
 
     @abstractmethod
     def execute(self) -> Self:
