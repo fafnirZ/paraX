@@ -2,12 +2,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Optional
 from parax.base import BaseExecutor
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 
 if TYPE_CHECKING:
     from tqdm import tqdm
 
-class ThreadedExecutor(BaseExecutor):
+class ProcessExecutor(BaseExecutor):
 
     def __init__(
         self,
@@ -31,17 +31,9 @@ class ThreadedExecutor(BaseExecutor):
             tqdm_description=tqdm_description,
             tqdm_class=tqdm_class,
         )
-    
-    @staticmethod
-    def default_num_workers() -> int:
-        """For threadpool, the default should be something large.
-        
-        Since, it is not CPU bound.
-        """
-        return 100 
 
-    def execute(self) -> ThreadedExecutor:
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+    def execute(self) -> ProcessExecutor:
+        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
             self._tqdm_init()
             for batch in self.yield_batch():
                 completed_futures: set[Future] = set()
