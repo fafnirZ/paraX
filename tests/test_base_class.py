@@ -113,3 +113,28 @@ def test_yield_batch(
 
     assert kwgs == input
     assert num_batches == expected_num_batches
+
+
+
+def test_worker_fn_validations():
+    class BasicExecutor(BaseExecutor):
+        def execute(self):
+            for kwargs in self.worker_fn_kwargs:
+                self.worker_fn(kwargs)
+
+        # override function so input validations arent conducted
+        def validate_attributes(self):
+            pass
+    
+    def worker(arg):
+        pass
+
+    kwargs = [1, 2]
+
+    executor = BasicExecutor(
+        worker_fn=worker,
+        worker_fn_kwargs=kwargs,
+    )
+    executor.execute()
+
+    assert 1 == 0
