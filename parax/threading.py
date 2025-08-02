@@ -52,6 +52,8 @@ class ThreadedExecutor(BaseExecutor):
                         all_futures=all_futures, 
                         completed_futures_mut=completed_futures
                     )
+                    self._tqdm_update(1)
+
             self._tqdm_close()
 
         return self

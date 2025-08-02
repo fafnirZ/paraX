@@ -229,7 +229,7 @@ class BaseExecutor(ABC):
         try:
             result = future.result()
             self.results.append(result)
-            completed_futures_mut.append(future)
+            completed_futures_mut.add(future)
 
         except Exception as e:
             # cancels all incomplete futures on any exception being raised
