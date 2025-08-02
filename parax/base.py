@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Optional, Self, Type
+from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
 from collections.abc import Callable
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ class BaseExecutor(ABC):
     worker_fn_kwargs: list[dict[str, Any]]
     num_workers: int
     batch_size: int
-    result: list[Any]
+    results: list[Any]
 
 
     tqdm_enabled: bool
@@ -67,8 +67,7 @@ class BaseExecutor(ABC):
         )
 
         self.validate_attributes()
-        self.tqdm_instance = self._tqdm_init()
-        self.result = []
+        self.results = []
 
     @staticmethod
     def init_tqdm(
@@ -174,31 +173,43 @@ class BaseExecutor(ABC):
         if not issubclass(self.tqdm_class, tqdm): 
             msg = f"provided tqdm_class {self.tqdm_class} is not a subclass of tqdm"
             raise TypeError(msg)
-    
 
+    def yield_batch(self) -> Generator[list[dict], Any, Any]:
+        for chunk_start_index in range(0, len(self.worker_fn_kwargs), self.batch_size):
+            yield self.worker_fn_kwargs[chunk_start_index: chunk_start_index+self.batch_size]
+
+    
+    ########
+    # tqdm #
+    ########
     def _is_tqdm_enabled(self) -> bool:
         return self.tqdm_enabled
 
     def _tqdm_init(self) -> tqdm | None:
         if self._is_tqdm_enabled():
-            return self.tqdm_class(
+            self.tqdm_instance = self.tqdm_class(
                 total=len(self.worker_fn_kwargs),
                 desc=self.tqdm_description,
             )
 
     def _tqdm_update(self, amount: int):
         if self._is_tqdm_enabled():
+            if not self.tqdm_instance:
+                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
             self.tqdm_instance.update(amount) 
         # else NOOP
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
+            if not self.tqdm_instance:
+                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
             self.tqdm_instance.close()
 
     @abstractmethod
     def execute(self) -> Self:
         raise NotImplementedError("The BaseClass should implement this.")
     
-    
+    def get_results(self) -> list[Any]:
+        return self.results
 
 
