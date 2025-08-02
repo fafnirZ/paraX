@@ -1,0 +1,141 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, Optional, Self, Type
+
+if TYPE_CHECKING:
+    from tqdm import tqdm
+
+class BaseExecutor(ABC):
+    """Base executor which outlines the general template which all executors follow.
+    
+    Abstract_methods:
+        execute()
+    
+    Attributes:
+        .worker_fn
+        .worker_fn_kwargs
+        .num_workers
+        .batch_size
+        .results
+        .tqdm_instance
+
+    Methods:
+        .setter(tqdm_instance)
+        ._is_tqdm_enabled
+        ._tqdm_init
+        ._tqdm_update
+        ._tqdm_close
+    """
+    worker_fn: callable
+    worker_fn_kwargs: list[dict[str, Any]]
+    num_workers: int
+    batch_size: int
+    tqdm_class: Type[tqdm] # must be a subclas of tqdm
+
+    def __init__(
+        self,
+        *,
+        worker_fn: callable,
+        worker_fn_kwargs: list[dict[str, Any]],
+        num_workers: Optional[int] = None,
+        batch_size: Optional[int] = None,
+
+        # tqdm related
+        tqdm_enabled: Optional[bool] = None,
+        tqdm_description: Optional[str] = None,
+        tqdm_class: Optional[type[tqdm]] = None,
+    ):
+        self.worker_fn = worker_fn
+        self.worker_fn_kwargs = worker_fn_kwargs
+        self.num_workers = num_workers or self.default_num_workers()
+        self.batch_size = batch_size or self.default_batch_size()
+        
+        (self.tqdm_enabled, self.tqdm_description, self.tqdm_class) = self.init_tqdm(
+            input_tqdm_enabled=tqdm_enabled, 
+            input_tqdm_description=tqdm_description, 
+            input_tqdm_class=tqdm_class,
+        )
+
+        self.validate_attributes()
+
+    @staticmethod
+    def init_tqdm(
+        *,
+        input_tqdm_enabled: Optional[bool],
+        input_tqdm_description: Optional[str],
+        input_tqdm_class: Optional[type[tqdm]],
+    ) -> tuple[bool, str, type[tqdm]]:
+        
+        if input_tqdm_enabled is False: # if user explicitly disables
+            return (
+                False,
+                None,
+                BaseExecutor.default_tqdm_class(),
+            )
+        else:
+            if input_tqdm_description is not None:
+                # we must enable tqdm if they provide a description
+                # even if the user doesn't provide enabled
+                _tqdm_enabled = True
+                _tqdm_description = input_tqdm_description
+            _tqdm_class = input_tqdm_class or BaseExecutor.default_tqdm_class()
+            return (
+                _tqdm_enabled,
+                _tqdm_description,
+                _tqdm_class,
+            )
+
+        
+
+        
+
+
+    @staticmethod
+    def default_tqdm_class() -> type[tqdm]:
+        from tqdm import tqdm # tqdm_std
+        return tqdm
+
+        
+
+
+
+    @staticmethod
+    def default_num_workers() -> int:
+        """Determine num workers from user's system."""
+        import os
+        return os.cpu_count()
+    
+    @staticmethod
+    def default_batch_size() -> int:
+        """Batch size explanation.
+
+        Explanation:
+            You want your batch size to be sufficiently large enough such that your workers are
+            always pre-occupied, but at the end of processing a batch, there is a point in time
+            where some workers are going to be idle.
+            
+            so if you set the batch size == num_workers then for each batch the bottleneck 
+            would be the time it takes for the longest worker to complete its job.
+
+            why batch then cant we just submit all jobs at once?
+            well then you incur the initialisation costs of submitting all jobs at once,
+            which may cause you to OOM.
+
+            so batches is a mechanism for me to chunk the job into appropriate sizes such that
+            I can handle huge jobs.
+
+            the number of batches will equal to `math.ceil(len(worker_fn_kwargs)/batch_size)`
+        """
+        return 1000
+    
+    def validate_attributes(self):
+        pass
+
+
+    @abstractmethod
+    def execute(self) -> Self:
+        raise NotImplementedError("The BaseClass should implement this.")
+    
+    
+
+
