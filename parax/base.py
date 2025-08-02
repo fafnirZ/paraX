@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
 from collections.abc import Callable
 
@@ -214,4 +215,35 @@ class BaseExecutor(ABC):
     def get_results(self) -> list[Any]:
         return self.results
 
-   
+    
+    ###################
+    # handles futures #
+    ###################
+    def handle_future(
+        self,
+        *, 
+        future: Future,
+        all_futures: list[Future],
+        completed_futures_mut: set[Future],
+    ):
+        try:
+            result = future.result()
+            self.results.append(result)
+            completed_futures_mut.append(future)
+
+        except Exception as e:
+            # cancels all incomplete futures on any exception being raised
+            for future in self.tqdm_class(all_futures, desc="Cancelling incomplete futures"):
+                if self.has_this_future_already_completed(future, completed_futures_mut):
+                    continue
+                # cancel incomplete
+                future.cancel()
+            print("Exeption encountered, cancelled all incomplete futures.")
+            raise e
+                
+    
+    @staticmethod
+    def has_this_future_already_completed(future: Future, completed_futures: set[Future]) -> bool:
+        if (future in completed_futures) and (future.done()):
+            return True
+        return False
