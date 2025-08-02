@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Optional, Self, Type
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from tqdm import tqdm
@@ -26,7 +27,7 @@ class BaseExecutor(ABC):
         ._tqdm_update
         ._tqdm_close
     """
-    worker_fn: callable
+    worker_fn: Callable
     worker_fn_kwargs: list[dict[str, Any]]
     num_workers: int
     batch_size: int
@@ -35,7 +36,7 @@ class BaseExecutor(ABC):
     def __init__(
         self,
         *,
-        worker_fn: callable,
+        worker_fn: Callable,
         worker_fn_kwargs: list[dict[str, Any]],
         num_workers: Optional[int] = None,
         batch_size: Optional[int] = None,
@@ -55,6 +56,9 @@ class BaseExecutor(ABC):
             input_tqdm_description=tqdm_description, 
             input_tqdm_class=tqdm_class,
         )
+        print(self.tqdm_enabled)
+        print(self.tqdm_description)
+        print(self.tqdm_class)
 
         self.validate_attributes()
 
@@ -78,6 +82,10 @@ class BaseExecutor(ABC):
                 # even if the user doesn't provide enabled
                 _tqdm_enabled = True
                 _tqdm_description = input_tqdm_description
+            else:
+                _tqdm_enabled = False
+                _tqdm_description = ""
+
             _tqdm_class = input_tqdm_class or BaseExecutor.default_tqdm_class()
             return (
                 _tqdm_enabled,
@@ -128,8 +136,8 @@ class BaseExecutor(ABC):
             error_msg = f"expected type {expected_type} for attribute self.{attribute_name}, instead got type {attribute_value_type}"
             return error_msg
 
-        if not isinstance(self.worker_fn, callable):
-            msg = generate_error_message("worker_fn", callable)
+        if not isinstance(self.worker_fn, Callable):
+            msg = generate_error_message("worker_fn", Callable)
             raise TypeError(msg)
 
         for kwargs in self.worker_fn_kwargs:
