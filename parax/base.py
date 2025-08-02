@@ -15,13 +15,16 @@ class BaseExecutor(ABC):
     Attributes:
         .worker_fn
         .worker_fn_kwargs
-        .num_workers
-        .batch_size
+        .num_workers (default: user's cpu count)
+        .batch_size (default: 1000)
         .results
+
+        .tqdm_enabled
+        .tqdm_description
+        .tqdm_class
         .tqdm_instance
 
     Methods:
-        .setter(tqdm_instance)
         ._is_tqdm_enabled
         ._tqdm_init
         ._tqdm_update
@@ -31,7 +34,13 @@ class BaseExecutor(ABC):
     worker_fn_kwargs: list[dict[str, Any]]
     num_workers: int
     batch_size: int
+    result: list[Any]
+
+
+    tqdm_enabled: bool
+    tqdm_description: str
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
+    tqdm_instance: tqdm | None 
 
     def __init__(
         self,
@@ -58,6 +67,8 @@ class BaseExecutor(ABC):
         )
 
         self.validate_attributes()
+        self.tqdm_instance = self._tqdm_init()
+        self.result = []
 
     @staticmethod
     def init_tqdm(
@@ -163,6 +174,26 @@ class BaseExecutor(ABC):
         if not issubclass(self.tqdm_class, tqdm): 
             msg = f"provided tqdm_class {self.tqdm_class} is not a subclass of tqdm"
             raise TypeError(msg)
+    
+
+    def _is_tqdm_enabled(self) -> bool:
+        return self.tqdm_enabled
+
+    def _tqdm_init(self) -> tqdm | None:
+        if self._is_tqdm_enabled():
+            return self.tqdm_class(
+                total=len(self.worker_fn_kwargs),
+                desc=self.tqdm_description,
+            )
+
+    def _tqdm_update(self, amount: int):
+        if self._is_tqdm_enabled():
+            self.tqdm_instance.update(amount) 
+        # else NOOP
+
+    def _tqdm_close(self):
+        if self._is_tqdm_enabled():
+            self.tqdm_instance.close()
 
     @abstractmethod
     def execute(self) -> Self:
