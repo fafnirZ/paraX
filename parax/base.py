@@ -4,6 +4,8 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
 from collections.abc import Callable
 
+from parax.decorators import apply_all_decorators
+
 if TYPE_CHECKING:
     from tqdm import tqdm
 
@@ -60,7 +62,7 @@ class BaseExecutor(ABC):
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
     ):
-        self.worker_fn = worker_fn
+        self.worker_fn = apply_all_decorators(worker_fn)
         self.worker_fn_kwargs = worker_fn_kwargs
         self.num_workers = num_workers or self.default_num_workers()
         self.batch_size = batch_size or self.default_batch_size()
@@ -73,7 +75,6 @@ class BaseExecutor(ABC):
 
         self.validate_attributes()
         self.results = []
-        # self.__decorate_worker_fn() # mutates worker fn with decorators
 
     ############################
     # initialisation functions #
@@ -253,20 +254,5 @@ class BaseExecutor(ABC):
             return True
         return False
 
-    # ####################################
-    # # worker function decorator        #
-    # # which enforces certain rules     #  
-    # # I impose on this library's usage #
-    # ####################################
-
-    # def __decorate_worker_fn(self):
-    #     self.worker_fn = self.validate_kwargs_only(self.worker_fn)
         
 
-    # @staticmethod
-    # def validate_kwargs_only(func):
-    #     def _wrapper(*args, **kwargs):
-    #         if len(args) != 0:
-    #             raise ValueError(f"Workers must be kwargs only, detected args: {args}")
-    #         return func(**kwargs)
-    #     return _wrapper

@@ -31,7 +31,7 @@ if __name__ == "__main__":
     import random
     requests = [
         {"iterations": random.randrange(10000,2000000)}
-        for _ in range(50)
+        for _ in range(25)
     ]
 
     print("[*] thread pool executor for cpu intensive") 
