@@ -73,6 +73,11 @@ class BaseExecutor(ABC):
 
         self.validate_attributes()
         self.results = []
+        self.__decorate_worker_fn() # mutates worker fn with decorators
+
+    ############################
+    # initialisation functions #
+    ############################
 
     @staticmethod
     def init_tqdm(
@@ -247,3 +252,21 @@ class BaseExecutor(ABC):
         if (future in completed_futures) and (future.done()):
             return True
         return False
+
+    ####################################
+    # worker function decorator        #
+    # which enforces certain rules     #  
+    # I impose on this library's usage #
+    ####################################
+
+    def __decorate_worker_fn(self):
+        self.worker_fn = self.validate_kwargs_only(self.worker_fn)
+        
+
+    @staticmethod
+    def validate_kwargs_only(func):
+        def _wrapper(*args, **kwargs):
+            if len(args) != 0:
+                raise ValueError(f"Workers must be kwargs only, detected args: {args}")
+            return func(**kwargs)
+        return _wrapper
