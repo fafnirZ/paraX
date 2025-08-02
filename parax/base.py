@@ -42,6 +42,10 @@ class BaseExecutor(ABC):
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
     tqdm_instance: tqdm | None 
 
+    @abstractmethod
+    def execute(self) -> Self:
+        raise NotImplementedError("The BaseClass should implement this.")
+
     def __init__(
         self,
         *,
@@ -204,12 +208,10 @@ class BaseExecutor(ABC):
             if not self.tqdm_instance:
                 raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
             self.tqdm_instance.close()
+        # else NOOP
 
-    @abstractmethod
-    def execute(self) -> Self:
-        raise NotImplementedError("The BaseClass should implement this.")
     
     def get_results(self) -> list[Any]:
         return self.results
 
-
+   
