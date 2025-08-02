@@ -9,11 +9,11 @@ as well as to handle common issues such as:
 - or skipping it.
 
 ## goals
-- [ ] ThreadPoolExecutor
+- [x] ThreadPoolExecutor
 - [ ] ProcessPoolExecutor
-- [ ] 1 single tqdm bar
+- [x] 1 single tqdm bar
 - [ ] 1 bar per worker
-- [ ] cancel subsequent workers on failure
+- [x] cancel subsequent workers on failure
 - [ ] retry failed workers
 - [ ] skipping failed workers
 - [ ] document performance issues with ProcessPoolExecutor re: serialisation of objects and provide alternative i.e. SHM use ZeroCopy frameworks.
