@@ -1,0 +1,29 @@
+[project]
+
+name = "parax"
+version="0.0.1"
+description = "python multi-thread/processing boilerplate library w/ tqdm progress bar"
+requires-python = ">=3.10"
+dependencies = [
+    "tqdm",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "pytest-env",
+    "pytest-xdist",
+]
+
+
+[tools.pytest.ini_options]
+test_paths = ["tests"]
+addopts = [
+    "-vv",
+    "--import-mode=importlib",
+]
+env = []
+
+
