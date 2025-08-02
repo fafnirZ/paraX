@@ -56,9 +56,6 @@ class BaseExecutor(ABC):
             input_tqdm_description=tqdm_description, 
             input_tqdm_class=tqdm_class,
         )
-        print(self.tqdm_enabled)
-        print(self.tqdm_description)
-        print(self.tqdm_class)
 
         self.validate_attributes()
 
@@ -69,12 +66,12 @@ class BaseExecutor(ABC):
         input_tqdm_description: Optional[str],
         input_tqdm_class: Optional[type[tqdm]],
     ) -> tuple[bool, str, type[tqdm]]:
-        
+        """tqdm is not enabled unless a description is provided.""" 
         if input_tqdm_enabled is False: # if user explicitly disables
             return (
                 False,
-                "",
-                BaseExecutor.default_tqdm_class(),
+                input_tqdm_description or "",
+                input_tqdm_class or BaseExecutor.default_tqdm_class(),
             )
         else:
             if input_tqdm_description is not None:
