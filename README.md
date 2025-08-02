@@ -17,3 +17,10 @@ as well as to handle common issues such as:
 - [ ] retry failed workers
 - [ ] skipping failed workers
 - [ ] document performance issues with ProcessPoolExecutor re: serialisation of objects and provide alternative i.e. SHM use ZeroCopy frameworks.
+
+## READTHIS
+this section gives a good idea as to when ThreadPoolExecutors / ProcessPoolExecutors should be used.
+
+this package is built completely on top of that, with the addition of useful boilerplate capabilities, like a progress bar and automatic cancellation of futures.
+
+https://superfastpython.com/threadpoolexecutor-vs-processpoolexecutor/#Differences_Between_ThreadPoolExecutor_and_ProcessPoolExecutor
