@@ -51,7 +51,9 @@ if __name__ == "__main__":
         ProcessExecutor(
             worker_fn=calculate_pi_monte_carlo,
             worker_fn_kwargs=requests,
-            tqdm_description="calculating pi monte carlos [cpu bound] using threadpool..."
+            num_workers=10,
+            tqdm_description="calculating pi monte carlos [cpu bound] using threadpool...",
+            tqdm_mode="multi",
         )
         .execute()
     )
