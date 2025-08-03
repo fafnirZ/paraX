@@ -1,10 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, as_completed
-from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
+from typing import TYPE_CHECKING, Any, Generator, Optional, Type
 from collections.abc import Callable
 
-from parax.decorators import apply_all_decorators
 
 if TYPE_CHECKING:
     from tqdm import tqdm
@@ -224,7 +223,7 @@ class BaseExecutor(ABC):
         return self.results
 
     def execute(self) -> BaseExecutor:
-        with self.pool_executor(max_workers=self.num_workers) as executor:
+        with self.executor_type(max_workers=self.num_workers) as executor:
             self._tqdm_init()
             for batch in self.yield_batch():
                 completed_futures: set[Future] = set()

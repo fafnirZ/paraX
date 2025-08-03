@@ -54,6 +54,7 @@ class WorkerFunctionBuilder:
 
     def wrap(self, decorator: Callable):
         self.func = decorator(self.func) 
+        return self
 
     def get_function(self) -> Callable:
         return self.func

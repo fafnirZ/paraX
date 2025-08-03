@@ -28,6 +28,7 @@ class ThreadedExecutor(BaseExecutor):
             WorkerFunctionBuilder(worker_fn)
             .wrap(ValidateKwargsOnly)
             .wrap(ThreadAwareWorkerFunction)
+            .get_function()
         )
         super().__init__(
             worker_fn=_worker_fn,

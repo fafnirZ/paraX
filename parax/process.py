@@ -28,6 +28,7 @@ class ProcessExecutor(BaseExecutor):
             WorkerFunctionBuilder(worker_fn)
             .wrap(ValidateKwargsOnly)
             .wrap(ProcessAwareWorkerFunction)
+            .get_function()
         )
         super().__init__(
             worker_fn=_worker_fn,
