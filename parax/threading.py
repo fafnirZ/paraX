@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from parax.base import BaseExecutor
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
+from parax.decorators import ThreadAwareWorkerFunction, ValidateKwargsOnly, WorkerFunctionBuilder
+
 if TYPE_CHECKING:
     from tqdm import tqdm
 
@@ -22,8 +24,13 @@ class ThreadedExecutor(BaseExecutor):
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
     ):
+        _worker_fn = (
+            WorkerFunctionBuilder(worker_fn)
+            .wrap(ValidateKwargsOnly)
+            .wrap(ThreadAwareWorkerFunction)
+        )
         super().__init__(
-            worker_fn=worker_fn,
+            worker_fn=_worker_fn,
             worker_fn_kwargs=worker_fn_kwargs,
             num_workers=num_workers,
             batch_size=batch_size,

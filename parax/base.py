@@ -62,7 +62,7 @@ class BaseExecutor(ABC):
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
     ):
-        self.worker_fn = apply_all_decorators(worker_fn)
+        self.worker_fn = worker_fn
         self.worker_fn_kwargs = worker_fn_kwargs
         self.num_workers = num_workers or self.default_num_workers()
         self.batch_size = batch_size or self.default_batch_size()
