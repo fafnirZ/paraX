@@ -212,6 +212,8 @@ class BaseExecutor(ABC):
                         desc=self.tqdm_description,
                     )
                 case "multi":
+                    if self.num_workers > 100:
+                        print("[WARNING]: its getting to the point of this not being visually useful...")
                     self.tqdm_instances = {
                         index: self.tqdm_class(
                             position=index,
@@ -252,6 +254,17 @@ class BaseExecutor(ABC):
     def _tqdm_update(self, *, amount:int, worker_id: int):
         pass
 
+    def _init_workers_tqdm_map(self, executor: Executor):
+        """This function will perform the following.
+        
+        Initialise 1 thread/process for each worker.
+        Get the process/thread_id, and return it, we then create
+        an index -> process/thread_id map, such that we can 
+        map the process/thread_id to an index for it to update a
+        tqdm instance at that index.
+        """
+        pass 
+
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
             if not self.tqdm_instance:
@@ -266,6 +279,7 @@ class BaseExecutor(ABC):
     def execute(self) -> BaseExecutor:
         with self.executor_type(max_workers=self.num_workers) as executor:
             self._tqdm_init()
+            self._init_workers_tqdm_map(executor)
             for batch in self.yield_batch():
                 completed_futures: set[Future] = set()
                 all_futures: list[Future] = [
