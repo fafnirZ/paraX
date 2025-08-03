@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, as_completed
-from typing import TYPE_CHECKING, Any, Generator, Optional, Type
+from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type
 from collections.abc import Callable
 
 
@@ -43,7 +43,8 @@ class BaseExecutor(ABC):
     tqdm_enabled: bool
     tqdm_description: str
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
-    tqdm_instance: tqdm | None 
+    tqdm_instance: tqdm | None
+    tqdm_mode: Literal["normal", "multi"]
 
     @property
     @abstractmethod
@@ -62,6 +63,7 @@ class BaseExecutor(ABC):
         tqdm_enabled: Optional[bool] = None,
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
+        tqdm_mode: Optional[str] = None
     ):
         self.worker_fn = worker_fn
         self.worker_fn_kwargs = worker_fn_kwargs
@@ -73,6 +75,7 @@ class BaseExecutor(ABC):
             input_tqdm_description=tqdm_description, 
             input_tqdm_class=tqdm_class,
         )
+        self.tqdm_mode = tqdm_mode or self.default_tqdm_mode()
 
         self.validate_attributes()
         self.results = []
@@ -116,6 +119,9 @@ class BaseExecutor(ABC):
     def default_tqdm_class() -> type[tqdm]:
         from tqdm import tqdm # tqdm_std
         return tqdm
+    @staticmethod
+    def default_tqdm_mode() -> str:
+        return "normal"
 
     @staticmethod
     def default_num_workers() -> int:
@@ -199,10 +205,16 @@ class BaseExecutor(ABC):
 
     def _tqdm_init(self) -> tqdm | None:
         if self._is_tqdm_enabled():
-            self.tqdm_instance = self.tqdm_class(
-                total=len(self.worker_fn_kwargs),
-                desc=self.tqdm_description,
-            )
+            match self.tqdm_mode:
+                case "normal":
+                    self.tqdm_instance = self.tqdm_class(
+                        total=len(self.worker_fn_kwargs),
+                        desc=self.tqdm_description,
+                    )
+                case "multi":
+                    raise NotImplementedError
+                case _ :
+                    raise ValueError(f"Invalid tqdm mode, expected 'normal' or 'multi', instead got {self.tqdm_mode}")
 
     def _tqdm_update(self, amount: int):
         if self._is_tqdm_enabled():
