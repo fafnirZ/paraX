@@ -304,12 +304,14 @@ class BaseExecutor(ABC):
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
-            if not self.tqdm_instance:
-                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            match self.default_tqdm_mode:
+            match self.tqdm_mode:
                 case "normal":
+                    if not self.tqdm_instance:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
                     self.tqdm_instance.close()
                 case "multi":
+                    if not self.tqdm_instances:
+                        raise RuntimeError("Missing tqdm instances for some reason, did you call _tqdm_init()?")
                     for instance in self.tqdm_instances.values():
                         instance.close() 
                 case _:
@@ -359,7 +361,6 @@ class BaseExecutor(ABC):
         # TODO handle futures based on whether multi is selected or not.
         try:
             result = future.result()
-            
             match self.tqdm_mode:
                 case "normal":
                     self.results.append(result)
@@ -379,13 +380,18 @@ class BaseExecutor(ABC):
 
 
         except Exception as e:
+            # closing all tqdm instances first before print anything
+            # otherwise the stdout will be messed up
+            self._tqdm_close()
+
             # cancels all incomplete futures on any exception being raised
-            for future in self.tqdm_class(all_futures, desc="Cancelling incomplete futures"):
+            print("Exeption encountered, cancelled all incomplete futures.")
+            for future in all_futures:
                 if self.has_this_future_already_completed(future, completed_futures_mut):
                     continue
                 # cancel incomplete
                 future.cancel()
-            print("Exeption encountered, cancelled all incomplete futures.")
+            print("cancelled...")
             raise e
                 
     
