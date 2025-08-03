@@ -238,11 +238,11 @@ class BaseExecutor(ABC):
 
     def _tqdm_update(self, **kwargs):
         if self._is_tqdm_enabled():
-            if not self.tqdm_instance:
-                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            
             match self.tqdm_mode:
                 case "normal":
+                    if not self.tqdm_instance:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
+            
                     amount = kwargs.get("amount", None)
                     if not amount:
                         raise RuntimeError("tqdm update failure.")
@@ -250,6 +250,8 @@ class BaseExecutor(ABC):
                 case "multi":
                     if len(kwargs) != 2:
                         raise RuntimeError(f"Expected inputs to this function to be 2, got {len(kwargs)}")
+                    if not self.tqdm_instances:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
                     amount = kwargs.get("amount", None)
                     worker_id = kwargs.get("worker_id", None)
                     if not amount:
