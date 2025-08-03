@@ -10,9 +10,9 @@ as well as to handle common issues such as:
 
 ## goals
 - [x] ThreadPoolExecutor
-- [ ] ProcessPoolExecutor
+- [x] ProcessPoolExecutor
 - [x] 1 single tqdm bar
-- [ ] 1 bar per worker
+- [x] 1 bar per worker
 - [x] cancel subsequent workers on failure
 - [ ] retry failed workers
 - [ ] skipping failed workers
