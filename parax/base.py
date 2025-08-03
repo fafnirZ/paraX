@@ -250,6 +250,9 @@ class BaseExecutor(ABC):
                         raise RuntimeError("tqdm update failure, 'amount' is None") 
                     if not worker_id:
                         raise RuntimeError("tqdm update failure, 'worker_id' is None")
+                    
+                    tqdm_index = self.worker_id_to_index_map[worker_id]
+                    self.tqdm_instances[tqdm_index].update(amount)
         # else NOOP
 
     @overload
@@ -337,7 +340,6 @@ class BaseExecutor(ABC):
                         all_futures=all_futures, 
                         completed_futures_mut=completed_futures
                     )
-                    self._tqdm_update(1)
 
             self._tqdm_close()
 
@@ -356,8 +358,24 @@ class BaseExecutor(ABC):
         # TODO handle futures based on whether multi is selected or not.
         try:
             result = future.result()
-            self.results.append(result)
-            completed_futures_mut.add(future)
+            
+            match self.tqdm_mode:
+                case "normal":
+                    self.results.append(result)
+                    completed_futures_mut.add(future)
+                    self._tqdm_update(1)
+                case "multi":
+                    if not isinstance(result, WorkerIdAndResultPacket):
+                        raise ValueError(f"Expected type: WorkerIdAndResultPacket, instead got: {type(result)}")
+                    worker_id = result.worker_id
+                    actual_results = result.result
+                    self.results.append(actual_results) 
+                    completed_futures_mut.add(future)
+                    self._tqdm_update(1, worker_id)
+                case _:
+                    raise RuntimeError("This shouldn't be reachable")
+
+
 
         except Exception as e:
             # cancels all incomplete futures on any exception being raised
