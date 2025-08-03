@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, as_completed
-from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type
+from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type, overload
 from collections.abc import Callable
 
 
@@ -212,20 +212,45 @@ class BaseExecutor(ABC):
                         desc=self.tqdm_description,
                     )
                 case "multi":
-                    self.tqdm_instance = self.tqdm_class(
-                        nrows=self.num_workers,
-                        total=int(len(self.worker_fn_kwargs)/self.num_workers), # initialise as evenly distributed, but will update total dynamically later.
-                        desc=self.tqdm_description,
-                    )
+                    self.tqdm_instances = {
+                        index: self.tqdm_class(
+                            position=index,
+                            total=int(len(self.worker_fn_kwargs)/self.num_workers), # initialise as evenly distributed, but will update total dynamically later.
+                            desc=self.tqdm_description,
+                        )
+                        for index in range(self.num_workers)
+                    }
                 case _ :
                     raise ValueError(f"Invalid tqdm mode, expected 'normal' or 'multi', instead got {self.tqdm_mode}")
 
-    def _tqdm_update(self, amount: int):
+    def _tqdm_update(self, **kwargs):
         if self._is_tqdm_enabled():
             if not self.tqdm_instance:
                 raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            self.tqdm_instance.update(amount) 
+            
+            match self.tqdm_mode:
+                case "normal":
+                    amount = kwargs.get("amount", None)
+                    if not amount:
+                        raise RuntimeError("tqdm update failure.")
+                    self.tqdm_instance.update(amount) 
+                case "multi":
+                    if len(kwargs) != 2:
+                        raise RuntimeError(f"Expected inputs to this function to be 2, got {len(kwargs)}")
+                    amount = kwargs.get("amount", None)
+                    worker_id = kwargs.get("worker_id", None)
+                    if not amount:
+                        raise RuntimeError("tqdm update failure, 'amount' is None") 
+                    if not worker_id:
+                        raise RuntimeError("tqdm update failure, 'worker_id' is None")
         # else NOOP
+
+    @overload
+    def _tqdm_update(self, *, amount:int):
+        pass
+    @overload
+    def _tqdm_update(self, *, amount:int, worker_id: int):
+        pass
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
