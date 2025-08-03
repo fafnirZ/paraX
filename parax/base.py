@@ -4,7 +4,7 @@ from concurrent.futures import Future, as_completed
 from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type, overload
 from collections.abc import Callable
 
-from parax.decorators import NOOP_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction, WorkerIdAndResultPacket
+from parax.decorators import NOOP_function, NOOP_sleep_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction, WorkerIdAndResultPacket
 
 
 if TYPE_CHECKING:
@@ -273,6 +273,12 @@ class BaseExecutor(ABC):
         an index -> process/thread_id map, such that we can 
         map the process/thread_id to an index for it to update a
         tqdm instance at that index.
+
+        NOTE: we need to use a NOOP_sleep_function
+        because otherwise, the function finishes too quickly, it wont
+        use up all the workers available and it'll not discover all 
+        available workers, which is not what we want.
+        The NOOP_sleep_function should also sleep for a sufficiently large time.
         """
         if self.tqdm_mode != "multi":
             return
@@ -280,9 +286,9 @@ class BaseExecutor(ABC):
         from parax.process import ProcessExecutor
         from parax.threading import ThreadedExecutor
         if self.__class__ == ProcessExecutor:
-            worker = ProcessAwareWorkerFunction(NOOP_function)
+            worker = ProcessAwareWorkerFunction(NOOP_sleep_function)
         elif self.__class__ == ThreadedExecutor:
-            worker = ThreadAwareWorkerFunction(NOOP_function)
+            worker = ThreadAwareWorkerFunction(NOOP_sleep_function)
         else:
             raise RuntimeError(f"Unknown subclass {self.__class__} are you sure its being correctly handled?")
         futures = [
@@ -297,6 +303,7 @@ class BaseExecutor(ABC):
             
             worker_ids.append(result.worker_id)
         
+        assert len(worker_ids) == self.num_workers
         # map the worker_id to an index.
         worker_id_to_index_map = {}
         for idx, worker_id in enumerate(worker_ids):
@@ -360,7 +367,6 @@ class BaseExecutor(ABC):
         all_futures: list[Future],
         completed_futures_mut: set[Future],
     ):
-        # TODO handle futures based on whether multi is selected or not.
         try:
             result = future.result()
             match self.tqdm_mode:
@@ -378,8 +384,6 @@ class BaseExecutor(ABC):
                     self._tqdm_update(amount=1, worker_id=worker_id)
                 case _:
                     raise RuntimeError("This shouldn't be reachable")
-
-
 
         except Exception as e:
             # closing all tqdm instances first before print anything

@@ -71,3 +71,7 @@ class WorkerFunctionBuilder:
 # i need this so I can wrap this in decorators which does stuff
 def NOOP_function():
     pass
+
+def NOOP_sleep_function():
+    import time
+    time.sleep(0.5)
