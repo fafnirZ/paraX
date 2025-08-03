@@ -4,7 +4,7 @@ from concurrent.futures import Future, as_completed
 from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type, overload
 from collections.abc import Callable
 
-from parax.decorators import NOOP_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction
+from parax.decorators import NOOP_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction, WorkerIdAndResultPacket
 
 
 if TYPE_CHECKING:
@@ -44,8 +44,12 @@ class BaseExecutor(ABC):
     tqdm_enabled: bool
     tqdm_description: str
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
-    tqdm_instance: tqdm | None
     tqdm_mode: Literal["normal", "multi"]
+    tqdm_instance: tqdm | None
+    tqdm_instances: dict[int, tqdm] | None
+
+    # internal
+    worker_id_to_index_map: dict[int, int]
 
     @property
     @abstractmethod
@@ -279,16 +283,33 @@ class BaseExecutor(ABC):
             executor.submit(worker,)
             for _ in range(self.num_workers)
         ]
-        results = []
+        worker_ids = []
         for future in as_completed(futures):
-            pass
-
+            result = future.result
+            if not isinstance(result, WorkerIdAndResultPacket):
+                raise ValueError(f"expected type: WorkerIdAndResultPacket, instead got: {result}")
+            
+            worker_ids.append(result.worker_id)
+        
+        # map the worker_id to an index.
+        worker_id_to_index_map = {}
+        for idx, worker_id in enumerate(worker_ids):
+            worker_id_to_index_map[worker_id] = idx
+        
+        self.worker_id_to_index_map = worker_id_to_index_map
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
             if not self.tqdm_instance:
                 raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            self.tqdm_instance.close()
+            match self.default_tqdm_mode:
+                case "normal":
+                    self.tqdm_instance.close()
+                case "multi":
+                    for instance in self.tqdm_instances.values():
+                        instance.close() 
+                case _:
+                    raise RuntimeError("Shouldnt be reachable...")
         # else NOOP
 
     
