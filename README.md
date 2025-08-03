@@ -8,6 +8,17 @@ as well as to handle common issues such as:
 - repeating it (if the worker is re-entrant)
 - or skipping it.
 
+## Example
+benchmarking the ThreadedExecutor vs ProcessExecutor 
+for CPU bound tasks.
+![broken](assets/normal.gif)
+
+multi-tqdm mode
+![broken](assets/multi.gif)
+
+## Installation
+todo
+
 ## goals
 - [x] ThreadPoolExecutor
 - [x] ProcessPoolExecutor
