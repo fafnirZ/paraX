@@ -229,6 +229,12 @@ class BaseExecutor(ABC):
                     }
                 case _ :
                     raise ValueError(f"Invalid tqdm mode, expected 'normal' or 'multi', instead got {self.tqdm_mode}")
+    @overload
+    def _tqdm_update(self, *, amount:int):
+        pass
+    @overload
+    def _tqdm_update(self, *, amount:int, worker_id: int):
+        pass
 
     def _tqdm_update(self, **kwargs):
         if self._is_tqdm_enabled():
@@ -255,12 +261,7 @@ class BaseExecutor(ABC):
                     self.tqdm_instances[tqdm_index].update(amount)
         # else NOOP
 
-    @overload
-    def _tqdm_update(self, *, amount:int):
-        pass
-    @overload
-    def _tqdm_update(self, *, amount:int, worker_id: int):
-        pass
+
 
     def _init_workers_tqdm_map(self, executor: Executor):
         """This function will perform the following.
@@ -363,7 +364,7 @@ class BaseExecutor(ABC):
                 case "normal":
                     self.results.append(result)
                     completed_futures_mut.add(future)
-                    self._tqdm_update(1)
+                    self._tqdm_update(amount=1)
                 case "multi":
                     if not isinstance(result, WorkerIdAndResultPacket):
                         raise ValueError(f"Expected type: WorkerIdAndResultPacket, instead got: {type(result)}")
@@ -371,7 +372,7 @@ class BaseExecutor(ABC):
                     actual_results = result.result
                     self.results.append(actual_results) 
                     completed_futures_mut.add(future)
-                    self._tqdm_update(1, worker_id)
+                    self._tqdm_update(amount=1, worker_id=worker_id)
                 case _:
                     raise RuntimeError("This shouldn't be reachable")
 
