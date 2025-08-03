@@ -288,7 +288,7 @@ class BaseExecutor(ABC):
         ]
         worker_ids = []
         for future in as_completed(futures):
-            result = future.result
+            result = future.result()
             if not isinstance(result, WorkerIdAndResultPacket):
                 raise ValueError(f"expected type: WorkerIdAndResultPacket, instead got: {result}")
             
