@@ -4,6 +4,8 @@ from concurrent.futures import Future, as_completed
 from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type, overload
 from collections.abc import Callable
 
+from parax.decorators import NOOP_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction
+
 
 if TYPE_CHECKING:
     from tqdm import tqdm
@@ -38,7 +40,6 @@ class BaseExecutor(ABC):
     num_workers: int
     batch_size: int
     results: list[Any]
-
 
     tqdm_enabled: bool
     tqdm_description: str
@@ -263,7 +264,25 @@ class BaseExecutor(ABC):
         map the process/thread_id to an index for it to update a
         tqdm instance at that index.
         """
-        pass 
+        if self.tqdm_mode != "multi":
+            return
+
+        from parax.process import ProcessExecutor
+        from parax.threading import ThreadedExecutor
+        if self.__class__ == ProcessExecutor:
+            worker = ProcessAwareWorkerFunction(NOOP_function)
+        elif self.__class__ == ThreadedExecutor:
+            worker = ThreadAwareWorkerFunction(NOOP_function)
+        else:
+            raise RuntimeError(f"Unknown subclass {self.__class__} are you sure its being correctly handled?")
+        futures = [
+            executor.submit(worker,)
+            for _ in range(self.num_workers)
+        ]
+        results = []
+        for future in as_completed(futures):
+            pass
+
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
@@ -313,6 +332,7 @@ class BaseExecutor(ABC):
         all_futures: list[Future],
         completed_futures_mut: set[Future],
     ):
+        # TODO handle futures based on whether multi is selected or not.
         try:
             result = future.result()
             self.results.append(result)

@@ -60,6 +60,8 @@ class WorkerFunctionBuilder:
         return self.func
 
 
-# def apply_all_decorators(func):
-#     fn = ValidateKwargsOnly(func)
-#     return fn
+# I need a globally accessible function
+# as a worker, such that processPool doesnt break
+# i need this so I can wrap this in decorators which does stuff
+def NOOP_function():
+    pass
