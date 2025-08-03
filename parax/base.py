@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from concurrent.futures import Future
+from concurrent.futures import Future, as_completed
 from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
 from collections.abc import Callable
 
@@ -8,6 +8,7 @@ from parax.decorators import apply_all_decorators
 
 if TYPE_CHECKING:
     from tqdm import tqdm
+    from concurrent.futures import Executor
 
 class BaseExecutor(ABC):
     """Base executor which outlines the general template which all executors follow.
@@ -45,8 +46,9 @@ class BaseExecutor(ABC):
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
     tqdm_instance: tqdm | None 
 
+    @property
     @abstractmethod
-    def execute(self) -> Self:
+    def executor_type(cls) -> type[Executor]:
         raise NotImplementedError("The BaseClass should implement this.")
 
     def __init__(
@@ -221,6 +223,31 @@ class BaseExecutor(ABC):
     def get_results(self) -> list[Any]:
         return self.results
 
+    def execute(self) -> BaseExecutor:
+        with self.pool_executor(max_workers=self.num_workers) as executor:
+            self._tqdm_init()
+            for batch in self.yield_batch():
+                completed_futures: set[Future] = set()
+                all_futures: list[Future] = [
+                    executor.submit(
+                        self.worker_fn,
+                        **kwargs_dict,
+                    )
+                    for kwargs_dict in batch
+                ]
+
+                # blocking until all futures in batch complete.
+                for future in as_completed(all_futures):
+                    self.handle_future(
+                        future=future, 
+                        all_futures=all_futures, 
+                        completed_futures_mut=completed_futures
+                    )
+                    self._tqdm_update(1)
+
+            self._tqdm_close()
+
+        return self
     
     ###################
     # handles futures #

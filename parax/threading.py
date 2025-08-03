@@ -47,28 +47,6 @@ class ThreadedExecutor(BaseExecutor):
         """
         return 100 
 
-    def execute(self) -> ThreadedExecutor:
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            self._tqdm_init()
-            for batch in self.yield_batch():
-                completed_futures: set[Future] = set()
-                all_futures: list[Future] = [
-                    executor.submit(
-                        self.worker_fn,
-                        **kwargs_dict,
-                    )
-                    for kwargs_dict in batch
-                ]
-
-                # blocking until all futures in batch complete.
-                for future in as_completed(all_futures):
-                    self.handle_future(
-                        future=future, 
-                        all_futures=all_futures, 
-                        completed_futures_mut=completed_futures
-                    )
-                    self._tqdm_update(1)
-
-            self._tqdm_close()
-
-        return self
+    @property
+    def executor_type(self) -> type[ThreadPoolExecutor]:
+        return ThreadPoolExecutor
