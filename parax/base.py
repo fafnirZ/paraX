@@ -1,13 +1,15 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from concurrent.futures import Future
-from typing import TYPE_CHECKING, Any, Generator, Optional, Self, Type
+from concurrent.futures import Future, as_completed
+from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, Type, overload
 from collections.abc import Callable
 
-from parax.decorators import apply_all_decorators
+from parax.decorators import NOOP_function, NOOP_sleep_function, ProcessAwareWorkerFunction, ThreadAwareWorkerFunction, WorkerIdAndResultPacket
+
 
 if TYPE_CHECKING:
     from tqdm import tqdm
+    from concurrent.futures import Executor
 
 class BaseExecutor(ABC):
     """Base executor which outlines the general template which all executors follow.
@@ -39,14 +41,19 @@ class BaseExecutor(ABC):
     batch_size: int
     results: list[Any]
 
-
     tqdm_enabled: bool
     tqdm_description: str
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
-    tqdm_instance: tqdm | None 
+    tqdm_mode: Literal["normal", "multi"]
+    tqdm_instance: tqdm | None
+    tqdm_instances: dict[int, tqdm] | None
 
+    # internal
+    worker_id_to_index_map: dict[int, int]
+
+    @property
     @abstractmethod
-    def execute(self) -> Self:
+    def executor_type(cls) -> type[Executor]:
         raise NotImplementedError("The BaseClass should implement this.")
 
     def __init__(
@@ -61,8 +68,9 @@ class BaseExecutor(ABC):
         tqdm_enabled: Optional[bool] = None,
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
+        tqdm_mode: Optional[Literal["normal", "multi"]] = None
     ):
-        self.worker_fn = apply_all_decorators(worker_fn)
+        self.worker_fn = worker_fn
         self.worker_fn_kwargs = worker_fn_kwargs
         self.num_workers = num_workers or self.default_num_workers()
         self.batch_size = batch_size or self.default_batch_size()
@@ -72,6 +80,7 @@ class BaseExecutor(ABC):
             input_tqdm_description=tqdm_description, 
             input_tqdm_class=tqdm_class,
         )
+        self.tqdm_mode = tqdm_mode or self.default_tqdm_mode()
 
         self.validate_attributes()
         self.results = []
@@ -115,6 +124,9 @@ class BaseExecutor(ABC):
     def default_tqdm_class() -> type[tqdm]:
         from tqdm import tqdm # tqdm_std
         return tqdm
+    @staticmethod
+    def default_tqdm_mode() -> str:
+        return "normal"
 
     @staticmethod
     def default_num_workers() -> int:
@@ -198,29 +210,152 @@ class BaseExecutor(ABC):
 
     def _tqdm_init(self) -> tqdm | None:
         if self._is_tqdm_enabled():
-            self.tqdm_instance = self.tqdm_class(
-                total=len(self.worker_fn_kwargs),
-                desc=self.tqdm_description,
-            )
+            match self.tqdm_mode:
+                case "normal":
+                    self.tqdm_instance = self.tqdm_class(
+                        total=len(self.worker_fn_kwargs),
+                        desc=self.tqdm_description,
+                    )
+                case "multi":
+                    if self.num_workers > 100:
+                        print("[WARNING]: its getting to the point of this not being visually useful...")
+                    self.tqdm_instances = {
+                        index: self.tqdm_class(
+                            position=index,
+                            total=int(len(self.worker_fn_kwargs)/self.num_workers), # initialise as evenly distributed, but will update total dynamically later.
+                            desc=self.tqdm_description,
+                        )
+                        for index in range(self.num_workers)
+                    }
+                case _ :
+                    raise ValueError(f"Invalid tqdm mode, expected 'normal' or 'multi', instead got {self.tqdm_mode}")
+    @overload
+    def _tqdm_update(self, *, amount:int):
+        pass
+    @overload
+    def _tqdm_update(self, *, amount:int, worker_id: int):
+        pass
 
-    def _tqdm_update(self, amount: int):
+    def _tqdm_update(self, **kwargs):
         if self._is_tqdm_enabled():
-            if not self.tqdm_instance:
-                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            self.tqdm_instance.update(amount) 
+            match self.tqdm_mode:
+                case "normal":
+                    if not self.tqdm_instance:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
+            
+                    amount = kwargs.get("amount", None)
+                    if not amount:
+                        raise RuntimeError("tqdm update failure.")
+                    self.tqdm_instance.update(amount) 
+                case "multi":
+                    if len(kwargs) != 2:
+                        raise RuntimeError(f"Expected inputs to this function to be 2, got {len(kwargs)}")
+                    if not self.tqdm_instances:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
+                    amount = kwargs.get("amount", None)
+                    worker_id = kwargs.get("worker_id", None)
+                    if not amount:
+                        raise RuntimeError("tqdm update failure, 'amount' is None") 
+                    if not worker_id:
+                        raise RuntimeError("tqdm update failure, 'worker_id' is None")
+                    
+                    tqdm_index = self.worker_id_to_index_map[worker_id]
+                    self.tqdm_instances[tqdm_index].update(amount)
         # else NOOP
+
+
+
+    def _init_workers_tqdm_map(self, executor: Executor):
+        """This function will perform the following.
+        
+        Initialise 1 thread/process for each worker.
+        Get the process/thread_id, and return it, we then create
+        an index -> process/thread_id map, such that we can 
+        map the process/thread_id to an index for it to update a
+        tqdm instance at that index.
+
+        NOTE: we need to use a NOOP_sleep_function
+        because otherwise, the function finishes too quickly, it wont
+        use up all the workers available and it'll not discover all 
+        available workers, which is not what we want.
+        The NOOP_sleep_function should also sleep for a sufficiently large time.
+        """
+        if self.tqdm_mode != "multi":
+            return
+
+        from parax.process import ProcessExecutor
+        from parax.threading import ThreadedExecutor
+        if self.__class__ == ProcessExecutor:
+            worker = ProcessAwareWorkerFunction(NOOP_sleep_function)
+        elif self.__class__ == ThreadedExecutor:
+            worker = ThreadAwareWorkerFunction(NOOP_sleep_function)
+        else:
+            raise RuntimeError(f"Unknown subclass {self.__class__} are you sure its being correctly handled?")
+        futures = [
+            executor.submit(worker,)
+            for _ in range(self.num_workers)
+        ]
+        worker_ids = []
+        for future in as_completed(futures):
+            result = future.result()
+            if not isinstance(result, WorkerIdAndResultPacket):
+                raise ValueError(f"expected type: WorkerIdAndResultPacket, instead got: {result}")
+            
+            worker_ids.append(result.worker_id)
+        
+        assert len(worker_ids) == self.num_workers
+        # map the worker_id to an index.
+        worker_id_to_index_map = {}
+        for idx, worker_id in enumerate(worker_ids):
+            worker_id_to_index_map[worker_id] = idx
+        
+        self.worker_id_to_index_map = worker_id_to_index_map
 
     def _tqdm_close(self):
         if self._is_tqdm_enabled():
-            if not self.tqdm_instance:
-                raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
-            self.tqdm_instance.close()
+            match self.tqdm_mode:
+                case "normal":
+                    if not self.tqdm_instance:
+                        raise RuntimeError("Missing tqdm instance for some reason, did you call _tqdm_init()?")
+                    self.tqdm_instance.close()
+                case "multi":
+                    if not self.tqdm_instances:
+                        raise RuntimeError("Missing tqdm instances for some reason, did you call _tqdm_init()?")
+                    for instance in self.tqdm_instances.values():
+                        instance.close() 
+                case _:
+                    raise RuntimeError("Shouldnt be reachable...")
         # else NOOP
 
     
     def get_results(self) -> list[Any]:
         return self.results
 
+    def execute(self) -> BaseExecutor:
+        with self.executor_type(max_workers=self.num_workers) as executor:
+            self._tqdm_init()
+            self._init_workers_tqdm_map(executor)
+            for batch in self.yield_batch():
+                completed_futures: set[Future] = set()
+                all_futures: list[Future] = [
+                    executor.submit(
+                        self.worker_fn,
+                        **kwargs_dict,
+                    )
+                    for kwargs_dict in batch
+                ]
+
+                # blocking until all futures in batch complete.
+                for future in as_completed(all_futures):
+                    self.handle_future(
+                        future=future, 
+                        all_futures=all_futures, 
+                        completed_futures_mut=completed_futures
+                    )
+
+            self._tqdm_close()
+
+        return self
     
     ###################
     # handles futures #
@@ -234,17 +369,35 @@ class BaseExecutor(ABC):
     ):
         try:
             result = future.result()
-            self.results.append(result)
-            completed_futures_mut.add(future)
+            match self.tqdm_mode:
+                case "normal":
+                    self.results.append(result)
+                    completed_futures_mut.add(future)
+                    self._tqdm_update(amount=1)
+                case "multi":
+                    if not isinstance(result, WorkerIdAndResultPacket):
+                        raise ValueError(f"Expected type: WorkerIdAndResultPacket, instead got: {type(result)}")
+                    worker_id = result.worker_id
+                    actual_results = result.result
+                    self.results.append(actual_results) 
+                    completed_futures_mut.add(future)
+                    self._tqdm_update(amount=1, worker_id=worker_id)
+                case _:
+                    raise RuntimeError("This shouldn't be reachable")
 
         except Exception as e:
+            # closing all tqdm instances first before print anything
+            # otherwise the stdout will be messed up
+            self._tqdm_close()
+
             # cancels all incomplete futures on any exception being raised
-            for future in self.tqdm_class(all_futures, desc="Cancelling incomplete futures"):
+            print("Exeption encountered, cancelled all incomplete futures.")
+            for future in all_futures:
                 if self.has_this_future_already_completed(future, completed_futures_mut):
                     continue
                 # cancel incomplete
                 future.cancel()
-            print("Exeption encountered, cancelled all incomplete futures.")
+            print("cancelled...")
             raise e
                 
     
