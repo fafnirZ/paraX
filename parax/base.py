@@ -63,7 +63,7 @@ class BaseExecutor(ABC):
         tqdm_enabled: Optional[bool] = None,
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
-        tqdm_mode: Optional[str] = None
+        tqdm_mode: Optional[Literal["normal", "multi"]] = None
     ):
         self.worker_fn = worker_fn
         self.worker_fn_kwargs = worker_fn_kwargs
@@ -212,7 +212,11 @@ class BaseExecutor(ABC):
                         desc=self.tqdm_description,
                     )
                 case "multi":
-                    raise NotImplementedError
+                    self.tqdm_instance = self.tqdm_class(
+                        nrows=self.num_workers,
+                        total=int(len(self.worker_fn_kwargs)/self.num_workers), # initialise as evenly distributed, but will update total dynamically later.
+                        desc=self.tqdm_description,
+                    )
                 case _ :
                     raise ValueError(f"Invalid tqdm mode, expected 'normal' or 'multi', instead got {self.tqdm_mode}")
 

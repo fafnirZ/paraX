@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 from parax.base import BaseExecutor
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 
@@ -23,6 +23,7 @@ class ProcessExecutor(BaseExecutor):
         tqdm_enabled: Optional[bool] = None,
         tqdm_description: Optional[str] = None,
         tqdm_class: Optional[type[tqdm]] = None,
+        tqdm_mode: Optional[Literal["normal", "multi"]] = None
     ):
         _worker_fn = (
             WorkerFunctionBuilder(worker_fn)
@@ -38,6 +39,7 @@ class ProcessExecutor(BaseExecutor):
             tqdm_enabled=tqdm_enabled,
             tqdm_description=tqdm_description,
             tqdm_class=tqdm_class,
+            tqdm_mode=tqdm_mode,
         )
 
 
