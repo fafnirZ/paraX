@@ -22,6 +22,9 @@ test = [
     "pytest-xdist",
 ]
 
+[tool.setuptools.packages.find]
+exclude = ["tests", "assets", "examples"]
+
 
 [tools.pytest.ini_options]
 test_paths = ["tests"]
