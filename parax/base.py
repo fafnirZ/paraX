@@ -41,6 +41,8 @@ class BaseExecutor(ABC):
     batch_size: int
     results: list[Any]
 
+    proc_creation_type: Literal["fork", "spawn"] = "fork"
+
     tqdm_enabled: bool
     tqdm_description: str
     tqdm_class: Type[tqdm] # must be a subclas of tqdm
@@ -63,6 +65,7 @@ class BaseExecutor(ABC):
         worker_fn_kwargs: list[dict[str, Any]],
         num_workers: Optional[int] = None,
         batch_size: Optional[int] = None,
+        proc_creation_type: Literal["fork", "spawn"] = "fork",
 
         # tqdm related
         tqdm_enabled: Optional[bool] = None,
@@ -74,6 +77,7 @@ class BaseExecutor(ABC):
         self.worker_fn_kwargs = worker_fn_kwargs
         self.num_workers = num_workers or self.default_num_workers()
         self.batch_size = batch_size or self.default_batch_size()
+        self.proc_creation_type = proc_creation_type
         
         (self.tqdm_enabled, self.tqdm_description, self.tqdm_class) = self.init_tqdm(
             input_tqdm_enabled=tqdm_enabled, 
@@ -332,7 +336,18 @@ class BaseExecutor(ABC):
         return self.results
 
     def execute(self) -> BaseExecutor:
-        with self.executor_type(max_workers=self.num_workers) as executor:
+        from parax.process import ProcessExecutor
+        # additional kwargs
+        additional_executor_kwargs = {}
+        if isinstance(self, ProcessExecutor):
+            import multiprocessing as mp
+            assert self.proc_creation_type in ["fork", "spawn"], f"Invalid proc_creation_type: {self.proc_creation_type}"
+            additional_executor_kwargs["mp_context"] = mp.get_context(self.proc_creation_type)
+
+        with self.executor_type(
+            max_workers=self.num_workers,
+            **additional_executor_kwargs,
+        ) as executor:
             self._tqdm_init()
             self._init_workers_tqdm_map(executor)
             for batch in self.yield_batch():

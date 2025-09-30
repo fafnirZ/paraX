@@ -18,6 +18,7 @@ class ProcessExecutor(BaseExecutor):
         worker_fn_kwargs: list[dict[str, Any]],
         num_workers: Optional[int] = None,
         batch_size: Optional[int] = None,
+        proc_creation_type: Literal["fork", "spawn"] = "fork",
 
         # tqdm related
         tqdm_enabled: Optional[bool] = None,
@@ -36,6 +37,7 @@ class ProcessExecutor(BaseExecutor):
             worker_fn_kwargs=worker_fn_kwargs,
             num_workers=num_workers,
             batch_size=batch_size,
+            proc_creation_type=proc_creation_type,
             tqdm_enabled=tqdm_enabled,
             tqdm_description=tqdm_description,
             tqdm_class=tqdm_class,

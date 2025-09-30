@@ -30,7 +30,7 @@ def test_threaded_executor():
     )
 
     assert all([
-        res == 100
+        res.result == 100
         for res in results
     ])
 
