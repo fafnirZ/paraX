@@ -2,12 +2,14 @@
 import pytest
 from parax.base import BaseExecutor
 from tqdm import tqdm
-
+class BasicExecutor(BaseExecutor):
+    def execute(self):
+        pass
+    def executor_type(self):
+        return BasicExecutor
+    
 
 def test_basic():
-    class BasicExecutor(BaseExecutor):
-        def execute(self):
-            pass
 
     def worker(**kwargs):
         pass
@@ -25,9 +27,7 @@ def test_basic():
 
 
 def test_description_enabled_tqdm():
-    class BasicExecutor(BaseExecutor):
-        def execute(self):
-            pass
+
     def worker(**kwargs):
         pass
     kwargs = [{"arg": 1}, {"arg": 2}]
@@ -44,9 +44,6 @@ def test_description_enabled_tqdm():
 
 
 def test_explicit_flags_take_priority():
-    class BasicExecutor(BaseExecutor):
-        def execute(self):
-            pass
 
     class CustomTQDM(tqdm):
         pass
@@ -88,9 +85,7 @@ def get_kwargs():
 def test_yield_batch(
     input, batch_size, expected_num_batches
 ):
-    class BasicExecutor(BaseExecutor):
-        def execute(self):
-            pass
+
 
     class CustomTQDM(tqdm):
         pass
@@ -122,6 +117,9 @@ def test_worker_fn_validations():
             for kwargs in self.worker_fn_kwargs:
                 self.worker_fn(kwargs)
 
+        def executor_type(self):
+            return BasicExecutor
+
         # override function so input validations arent conducted
         def validate_attributes(self):
             pass
@@ -136,5 +134,3 @@ def test_worker_fn_validations():
         worker_fn_kwargs=kwargs,
     )
     executor.execute()
-
-    assert 1 == 0
